@@ -13,6 +13,8 @@
         android:usesPermissionFlags="neverForLocation" android:minSdkVersion="32" />
 
     <application
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:label="نقل مباشر"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
