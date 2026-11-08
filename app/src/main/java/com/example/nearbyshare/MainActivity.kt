@@ -6,10 +6,14 @@ import android.app.AlertDialog
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -33,31 +37,58 @@ class MainActivity : Activity() {
     private val strategy = Strategy.P2P_POINT_TO_POINT
     private val serviceId = "com.example.nearbyshare"
 
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun round(color: Int, r: Int = 28) =
+        GradientDrawable().apply { setColor(color); cornerRadius = dp(r).toFloat() }
+    private fun lp(w: Int, h: Int, wt: Float = 0f, l: Int = 0, t: Int = 0, r: Int = 0, b: Int = 0) =
+        LinearLayout.LayoutParams(w, h, wt).apply { setMargins(dp(l), dp(t), dp(r), dp(b)) }
+    private fun btn(label: String, bg: Int, onClick: () -> Unit) = Button(this).apply {
+        text = label; setTextColor(Color.WHITE); textSize = 16f; isAllCaps = false
+        typeface = Typeface.DEFAULT_BOLD; background = round(bg); stateListAnimator = null
+        setPadding(dp(16), dp(14), dp(16), dp(14)); setOnClickListener { onClick() }
+    }
+    private fun setSend(on: Boolean) { sendBtn.isEnabled = on; sendBtn.alpha = if (on) 1f else 0.35f }
+
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         client = Nearby.getConnectionsClient(this)
+        val bg = 0xFF0B1220.toInt(); val card = 0xFF152036.toInt()
+        window.statusBarColor = bg; window.navigationBarColor = bg
+
         radar = RadarView(this).apply { onPeerClick = { id -> requestConn(id) } }
-        status = TextView(this).apply { text = "اختر استقبال أو بحث"; textSize = 17f; setPadding(40, 24, 40, 12) }
-        val recv = Button(this).apply { text = "📥 استقبال"; setOnClickListener { ensure { advertise() } } }
-        val find = Button(this).apply { text = "🔍 بحث"; setOnClickListener { ensure { discover() } } }
-        sendBtn = Button(this).apply {
-            text = "📤 إرسال صور / فيديو / ملفات"; isEnabled = false
-            setOnClickListener {
-                startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
-                    putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                }, 1)
-            }
+        val title = TextView(this).apply {
+            text = "نقل مباشر"; setTextColor(Color.WHITE); textSize = 28f; typeface = Typeface.DEFAULT_BOLD
         }
+        val sub = TextView(this).apply {
+            text = "شارك الصور والفيديو مع الأجهزة القريبة بدون إنترنت"
+            setTextColor(0xFF8FA3C4.toInt()); textSize = 14f
+        }
+        status = TextView(this).apply {
+            text = "اختر استقبال أو بحث"; setTextColor(Color.WHITE); textSize = 15f
+            gravity = Gravity.CENTER; background = round(card, 20)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }
+        val recv = btn("📥 استقبال", 0xFF0A84FF.toInt()) { ensure { advertise() } }
+        val find = btn("🔍 بحث", 0xFF5E5CE6.toInt()) { ensure { discover() } }
+        sendBtn = btn("📤 إرسال صور / فيديو / ملفات", 0xFF30D158.toInt()) {
+            startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+            }, 1)
+        }
+        setSend(false)
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            addView(recv, LinearLayout.LayoutParams(0, -2, 1f)); addView(find, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(recv, lp(0, -2, 1f, 0, 0, 6, 0)); addView(find, lp(0, -2, 1f, 6, 0, 0, 0))
         }
         setContentView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 72, 0, 24)
-            addView(radar, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(status); addView(row); addView(sendBtn)
+            setBackgroundColor(bg); setPadding(dp(20), dp(48), dp(20), dp(20))
+            addView(title); addView(sub, lp(-2, -2, 0f, 0, 4, 0, 8))
+            addView(radar, lp(-1, 0, 1f))
+            addView(status, lp(-1, -2, 0f, 0, 8, 0, 12))
+            addView(row, lp(-1, -2, 0f, 0, 0, 0, 10))
+            addView(sendBtn, lp(-1, -2))
         })
     }
 
@@ -119,12 +150,12 @@ class MainActivity : Activity() {
                 peer = id; client.stopAdvertising(); client.stopDiscovery()
                 radar.pulsing = false; radar.peers.clear()
                 radar.peers.add(RadarView.Peer(id, endpointNames[id] ?: "?")); radar.linked = true
-                radar.buzz(); sendBtn.isEnabled = true
+                radar.buzz(); setSend(true)
                 status.text = "✅ متصل بـ ${endpointNames[id]}"
             } else status.text = "تعذر الاتصال"
         }
         override fun onDisconnected(id: String) {
-            peer = null; sendBtn.isEnabled = false; radar.linked = false; radar.peers.clear(); radar.progress = -1f
+            peer = null; setSend(false); radar.linked = false; radar.peers.clear(); radar.progress = -1f
             status.text = "انقطع الاتصال"
         }
     }
